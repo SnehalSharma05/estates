@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8" />
+  <title>Reddit Monopoly</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="game-container">
+    <div id="turn-timer" style="position: absolute; top: 10px; right: 10px; font-size: 24px;">10</div>
+
+    <div class="game-layout">
+      <div class="board-section">
+        <div class="board">
+          <img src="monopoly.png" alt="Monopoly Board" id="board-image" />
+          <div id="board-spaces">
+            <!-- Will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-section">
+        <div class="player-info">
+          <h2>Current Turn: <span id="current-player">Waiting...</span></h2>
+          <h3>Money: $<span id="player-money">0</span></h3>
+        </div>
+
+        <div class="dice-section">
+          <button id="roll-dice" class="game-button">Roll Dice</button>
+          <div id="dice-result" class="dice-display"></div>
+        </div>
+
+        <div id="property-actions" class="property-panel ">
+          <h3><span id="current-property"></span></h3>
+          <div class="property-details">
+            <p>Price: $<span id="property-price">0</span></p>
+            <p>Rent: $<span id="property-rent">0</span></p>
+          </div>
+          <div class="action-buttons">
+            <button id="buy-property" class="game-button">Buy</button>
+            <button id="start-auction" class="game-button">Auction</button>
+            <button id="build-house" class="game-button">Build</button>
+          </div>
+        </div>
+
+        <div id="auction-info" class="auction-panel hidden">
+          <h3>Current Auction</h3>
+          <p>Highest Bid: $<span id="highest-bid">0</span></p>
+          <p>Time Left: <span id="auction-timer">0</span>s</p>
+          <input type="number" id="bid-amount" placeholder="Enter bid amount">
+          <button id="place-bid" class="game-button">Place Bid</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="application/javascript" src="script.js"></script>
+</body>
+
+</html>
