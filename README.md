@@ -1,7 +1,5 @@
 ## Estates: A Reddit-Themed Property Trading Game
 
-This document outlines the structure and features of Redditopoly, a board game inspired by Monopoly, with a Reddit twist.  It leverages Redis for state management, offers a web interface via webview, and integrates with the Reddit API for user interaction.
-
 ### Game Structure
 
 * **Players:** 2-5 players
