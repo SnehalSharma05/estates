@@ -1,5 +1,5 @@
 // Updated script.js
-class MonopolyGame {
+class estatesGame {
   constructor() {
     this.currentPlayer = null;
     this.players = [];
@@ -11,8 +11,49 @@ class MonopolyGame {
     this.setupEventListeners();
     this.initializeBoard();
     this.setupAnimations();
+    this.auctionInProgress = false;
+    this.auctionProperty = null;
+    this.auctionBids = [];
+    this.auctionTimerInterval = null;
+  }
+  calculateTotalWealth(player) {
+    const propertyValues = player.properties.reduce((sum, propertyId) => {
+      const property = this.properties.find(p => p.id === parseInt(propertyId));
+      return sum + (property ? property.price : 0);
+    }, 0);
+    return player.money + propertyValues;
   }
 
+  checkForGameOver() {
+    const bankruptPlayer = this.players.find(player => player.money <= 0);
+    if (bankruptPlayer) {
+      this.endGame();
+    }
+  }
+  endGame() {
+    const leaderboard = this.players
+      .map(player => ({
+        username: player.username,
+        totalWealth: this.calculateTotalWealth(player)
+      }))
+      .sort((a, b) => b.totalWealth - a.totalWealth);
+
+    // Display the leaderboard
+    const leaderboardHtml = leaderboard.map((entry, index) => `
+      <div class="leaderboard-entry">
+        <span class="leaderboard-rank">${index + 1}</span>
+        <span class="leaderboard-username">${entry.username}</span>
+        <span class="leaderboard-wealth">$${entry.totalWealth}</span>
+      </div>
+    `).join('');
+
+    this.elements.leaderboard.innerHTML = `
+      <h2>Game Over</h2>
+      <div class="leaderboard">${leaderboardHtml}</div>
+    `;
+    this.elements.leaderboard.classList.remove('hidden');
+    document.querySelector('.game-layout').classList.add('hidden'); // Hide the game layout
+  }
   initializeBoard() {
     const boardImage = document.querySelector('#board-image');
     this.boardSize = boardImage.offsetWidth;
@@ -42,7 +83,8 @@ class MonopolyGame {
       auctionTimer: document.querySelector('#auction-timer'),
       pucksContainer: document.querySelector('#pucks-container'),
       playerList: document.querySelector('#player-list'),
-      turnTimer: document.querySelector('#turn-timer')
+      turnTimer: document.querySelector('#turn-timer'),
+      leaderboard: document.querySelector('#leaderboard')
     };
   }
 
@@ -57,11 +99,20 @@ class MonopolyGame {
   handleMessage(event) {
     if (event.data.type === 'devvit-message') {
       const gameMessage = event.data.data.message;
-      if (gameMessage.type === 'updateGameState') {
-        this.updateGameState(gameMessage.data);
+      switch (gameMessage.type) {
+        case 'updateGameState':
+          this.updateGameState(gameMessage.data);
+          break;
+        case 'auctionBid':
+          this.handleAuctionBid(
+            gameMessage.data.playerId,
+            gameMessage.data.amount
+          );
+          break;
       }
     }
   }
+
   updateGameState({ currentPlayer, players, properties, currentUserId }) {
     if (!players || !properties || currentPlayer === undefined) return;
 
@@ -95,6 +146,8 @@ class MonopolyGame {
     this.turnTimerInterval = setTimeout(countdown, 1000);
   }
   handleTurnTimeout(playerId) {
+    clearTimeout(this.turnTimerInterval);
+    this.checkForGameOver();
     console.log('Turn timeout for player', playerId);
     window.parent?.postMessage(
       {
@@ -106,7 +159,6 @@ class MonopolyGame {
       '*'
     );
     // Logic to handle turn timeout
-    clearTimeout(this.turnTimerInterval);
     this.elements.turnTimer.textContent = 10;
     const playerIndex = this.players.findIndex(p => p.id === playerId);
     if (playerIndex !== -1) {
@@ -143,6 +195,131 @@ class MonopolyGame {
         </div>
       `)
       .join('');
+  }
+  handleStartAuction() {
+    const currentSpace = this.properties[this.currentPlayer.position];
+    if (!currentSpace || this.auctionInProgress) return;
+
+    this.auctionInProgress = true;
+    this.auctionProperty = currentSpace;
+    this.auctionBids = [];
+
+    // Stop existing turn timer
+    if (this.turnTimerInterval) {
+      clearTimeout(this.turnTimerInterval);
+    }
+
+    // Start auction timer
+    this.startAuctionTimer();
+
+    // Send message to parent to initiate auction comment
+    window.parent?.postMessage(
+      {
+        type: 'startAuction',
+        data: {
+          propertyName: currentSpace.name,
+          propertyPrice: 0,
+          playerId: this.currentPlayer.id
+        }
+      },
+      '*'
+    );
+    // Update UI
+    this.elements.auctionInfo.classList.remove('hidden');
+    this.elements.currentProperty.textContent = `Auction: ${currentSpace.name}`;
+    this.elements.highestBid.textContent = 'Starting...';
+    this.elements.propertyActions.classList.add('hidden');
+  }
+  startAuctionTimer() {
+    let timeLeft = 30; // 10 seconds for auction
+    this.elements.auctionTimer.textContent = timeLeft;
+
+    const countdown = () => {
+      timeLeft--;
+      this.elements.auctionTimer.textContent = timeLeft;
+
+      if (timeLeft <= 0) {
+        this.concludeAuction();
+      } else {
+        this.auctionTimerInterval = setTimeout(countdown, 1000);
+      }
+    };
+
+    this.auctionTimerInterval = setTimeout(countdown, 1000);
+  }
+  concludeAuction() {
+    if (this.auctionTimerInterval) {
+      clearTimeout(this.auctionTimerInterval);
+    }
+
+    // Find the highest valid bid
+    const validBids = this.auctionBids
+      .filter(bid =>
+        this.players.some(player =>
+          player.id === bid.playerId && player.money >= bid.amount
+        )
+      )
+      .sort((a, b) => b.amount - a.amount);
+
+    if (validBids.length > 0) {
+      const winningBid = validBids[0];
+      const winner = this.players.find(p => p.id === winningBid.playerId);
+
+      if (winner) {
+        // Send message to parent to process auction sale
+        window.parent?.postMessage(
+          {
+            type: 'auctionSale',
+            data: {
+              playerId: winner.id,
+              playerName: winner.username,
+              propertyId: this.auctionProperty.id,
+              propertyName: this.auctionProperty.name,
+              price: winningBid.amount
+            }
+          },
+          '*'
+        );
+      }
+    }
+
+    // Reset auction state
+    this.auctionInProgress = false;
+    this.auctionProperty = null;
+    this.auctionBids = [];
+    this.elements.auctionInfo.classList.add('hidden');
+
+    // Move to next turn
+    this.handleTurnTimeout(this.currentPlayer.id);
+  }
+  handleAuctionBid(playerId, amount) {
+    if (!this.auctionInProgress) return;
+
+    const player = this.players.find(p => p.id === playerId);
+    if (!player || player.money < amount) return;
+
+    // Check if bid is higher than previous bids
+    const currentHighestBid = Math.max(
+      0,
+      ...this.auctionBids.map(bid => bid.amount)
+    );
+
+    if (amount > currentHighestBid) {
+      // Remove previous bids from this player
+      this.auctionBids = this.auctionBids.filter(bid => bid.playerId !== playerId);
+
+      // Add new bid
+      this.auctionBids.push({ playerId, amount });
+
+      // Update UI
+      this.elements.highestBid.textContent = `$${amount} (${player.username})`;
+
+      // Restart auction timer
+      if (this.auctionTimerInterval) {
+        clearTimeout(this.auctionTimerInterval);
+      }
+      this.startAuctionTimer();
+    }
   }
 
   updatePlayerPositions() {
@@ -300,7 +477,7 @@ class MonopolyGame {
       },
       '*'
     );
-    setTimqout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
+    setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
     this.handleTurnTimeout(this.currentPlayer.id);
   }
   handleJailLanding(jailSpace) {
@@ -311,6 +488,7 @@ class MonopolyGame {
     } else {
       // Just visiting, no action needed
     }
+    clearTimeout(this.turnTimerInterval);
     setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
   }
   handlePropertyLanding(property) {
@@ -366,6 +544,7 @@ class MonopolyGame {
       },
       '*'
     );
+    clearTimeout(this.turnTimerInterval);
     setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
   }
 
@@ -430,6 +609,7 @@ class MonopolyGame {
       },
       '*'
     );
+    clearTimeout(this.turnTimerInterval);
     setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
   }
 
@@ -443,7 +623,8 @@ class MonopolyGame {
     const card = cards[Math.floor(Math.random() * cards.length)];
     card.action();
     this.elements.currentProperty.textContent = card.text;
-    setTimeout(() => this.handleLanding(this.currentPlayer.position), 2000);
+    clearTimeout(this.turnTimerInterval);
+    setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
   }
 
   handleChestLanding() {
@@ -456,8 +637,9 @@ class MonopolyGame {
     const card = cards[Math.floor(Math.random() * cards.length)];
     card.action();
     this.elements.currentProperty.textContent = card.text;
-    setTimeout(() => this.handleLanding(this.currentPlayer.position), 2000);
+    clearTimeout(this.turnTimerInterval);
+    setTimeout(() => this.handleTurnTimeout(this.currentPlayer.id), 2000);
   }
 }
 
-new MonopolyGame();
+new estatesGame();

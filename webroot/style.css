@@ -10,12 +10,14 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--reddit-grey);
 }
+
 .game-layout {
   display: flex;
   flex-direction: row;
   gap: 20px;
   padding: 0px;
 }
+
 .game-container {
   width: 600px;
   height: 500px;
@@ -23,6 +25,7 @@ body {
   flex-direction: row;
   gap: 10px;
 }
+
 .controls-section {
   flex: 1;
   width: 250px;
@@ -30,6 +33,7 @@ body {
   padding: 20px;
   border-radius: 8px;
 }
+
 .board {
   width: 450px;
   height: 450px;
@@ -40,7 +44,9 @@ body {
   position: relative;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
-.property-panel, .auction-panel {
+
+.property-panel,
+.auction-panel {
   margin-top: 20px;
   padding: 15px;
   background: rgba(255, 255, 255, 0.15);
@@ -52,6 +58,7 @@ body {
   gap: 10px;
   margin-top: 15px;
 }
+
 .board-section {
   flex: 0 0 auto;
 }
@@ -80,6 +87,7 @@ body {
   transition: transform 0.3s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
 .game-info {
   width: 120px;
   padding: 10px 5px;
@@ -106,13 +114,42 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+.leaderboard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-entry {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.leaderboard-rank {
+  font-weight: bold;
+}
+
+.hidden {
+  display: none;
+}
+
 .pucks-container {
+  border: #ccc 1px solid;
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Ensure pucks don't interfere with board interactions */
+  pointer-events: none;
+  /* Ensure pucks don't interfere with board interactions */
 }
 
 .player-puck {
@@ -122,6 +159,7 @@ body {
   position: absolute;
   transition: transform 0.5s ease;
 }
+
 .game-button {
   background: #cd272c;
   color: white;

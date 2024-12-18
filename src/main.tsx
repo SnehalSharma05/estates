@@ -77,7 +77,7 @@ Devvit.configure({
 });
 
 Devvit.addCustomPostType({
-  name: 'Reddit Monopoly',
+  name: 'Reddit estates',
   height: 'tall',
   render: (context) => {
     const [players, setPlayers] = useState<Player[]>([]);
@@ -110,7 +110,7 @@ Devvit.addCustomPostType({
       }
 
       if (gameState?.gameStarted) {
-        context.ui.webView.postMessage('monopolyBoard', {
+        context.ui.webView.postMessage('estatesBoard', {
           type: 'updateGameState',
           data: {
             currentPlayer: gameState.currentPlayer,
@@ -122,7 +122,57 @@ Devvit.addCustomPostType({
         });
       }
     }, 1000).start();
+    // Add a comment handler that parses comments for auction bids
+    Devvit.addTrigger({
+      event: 'CommentCreate',
+      async onEvent(event, context) {
+        // Ensure we have a postId to work with
+        if (!context.postId) return;
 
+        const comment = event.comment;
+        if (!comment) return;
+        const auctionCommentMatch = comment.body.match(/🏠 Auction started for (.*?)!\n/);
+
+        if (!auctionCommentMatch) return;
+
+        const propertyName = auctionCommentMatch[1];
+        const bidMatch = comment.body.match(/^#(\d+)$/);
+
+        if (bidMatch) {
+          const bidAmount = parseInt(bidMatch[1], 10);
+          let bidder: User | undefined;
+          try {
+            bidder = await context.reddit.getUserById(comment.author);
+          } catch (error) {
+            console.error('Error fetching user:', error);
+            return;
+          }
+
+          // Check if bidder is undefined before using
+          if (!bidder) {
+            return;
+          }
+
+          try {
+            // Check if the auction comment is a direct child of the original auction start comment
+            const parentComment = await context.reddit.getCommentById(comment.parentId);
+
+            if (!parentComment.body.includes(`🏠 Auction started for ${propertyName}!`)) {
+              return; // Not a valid auction bid
+            }
+
+            // Validate bid
+            await context.reddit.submitComment({
+              id: comment.parentId,
+              text: `@${bidder.username} bid $${bidAmount}! 
+    Current highest bid will be tracked in replies to this comment.`
+            });
+          } catch (error) {
+            console.error('Auction bid processing error:', error);
+          }
+        }
+      }
+    });
     const syncGameState = async (updatedState: GameState) => {
       if (!context.postId) return;
       await context.redis.set(`game_${context.postId}`, JSON.stringify(updatedState));
@@ -202,7 +252,7 @@ Devvit.addCustomPostType({
             updatedState.players[buyerIndex].money -= property.price;
             updatedState.players[buyerIndex].properties.push(property.id.toString());
             property.owner = msg.data.playerId;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
 
             await context.reddit.submitComment({
@@ -223,7 +273,7 @@ Devvit.addCustomPostType({
             property.rent.shift();
             property.rent.push(highestRent);
 
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -235,7 +285,7 @@ Devvit.addCustomPostType({
           if (payerIndex !== -1 && ownerIndex !== -1) {
             updatedState.players[payerIndex].money -= msg.data.amount;
             updatedState.players[ownerIndex].money += msg.data.amount;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -245,7 +295,7 @@ Devvit.addCustomPostType({
           const taxPayerIndex = updatedState.players.findIndex(p => p.id === msg.data.playerId);
           if (taxPayerIndex !== -1) {
             updatedState.players[taxPayerIndex].money -= msg.data.amount;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -257,7 +307,7 @@ Devvit.addCustomPostType({
           if (payerIndex !== -1 && ownerIndex !== -1) {
             updatedState.players[payerIndex].money -= msg.data.amount;
             updatedState.players[ownerIndex].money += msg.data.amount;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -267,7 +317,7 @@ Devvit.addCustomPostType({
           const playerIndex = updatedState.players.findIndex(p => p.id === msg.data.playerId);
           if (playerIndex !== -1) {
             updatedState.players[playerIndex].money += 200;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -277,7 +327,7 @@ Devvit.addCustomPostType({
           const playerIndex = updatedState.players.findIndex(p => p.id === msg.data.playerId);
           if (playerIndex !== -1) {
             updatedState.players[playerIndex].money += 500;
-            updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+            // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
             await syncGameState(updatedState);
           }
           break;
@@ -289,9 +339,43 @@ Devvit.addCustomPostType({
           if (playerIndex !== -1 && targetSpace) {
             updatedState.players[playerIndex].position = targetSpace.id;
             handleTurnTimer(() => {
-              updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
+              // updatedState.currentPlayer = (updatedState.currentPlayer + 1) % updatedState.players.length;
               syncGameState(updatedState);
             });
+            await syncGameState(updatedState);
+          }
+          break;
+        }
+        case 'startAuction': {
+          await context.reddit.submitComment({
+            text: `🏠 Auction started for ${msg.data.propertyName}! 
+        Players, bid by commenting #amount in a reply to this comment. 
+        Starting price: $${msg.data.propertyPrice}
+        Auction closes in 10 seconds!
+        
+        How to bid:
+        - Reply to this comment with #[your bid amount]
+        - Highest bid wins the property
+        - Bid must be higher than previous bids
+        - Only players in the game can bid`,
+            id: context.postId
+          });
+          break;
+        }
+        case 'auctionSale': {
+          const buyerIndex = updatedState.players.findIndex(p => p.id === msg.data.playerId);
+          const property = updatedState.properties[msg.data.propertyId];
+
+          if (buyerIndex !== -1 && property) {
+            updatedState.players[buyerIndex].money -= msg.data.price;
+            updatedState.players[buyerIndex].properties.push(property.id.toString());
+            property.owner = msg.data.playerId;
+
+            await context.reddit.submitComment({
+              text: `🔨 Auction won! u/${msg.data.playerName} bought ${msg.data.propertyName} for $${msg.data.price}.`,
+              id: context.postId
+            });
+
             await syncGameState(updatedState);
           }
           break;
@@ -313,7 +397,7 @@ Devvit.addCustomPostType({
 
     return !gameState?.gameStarted ? (
       <vstack padding="large" alignment="center" gap="large">
-        <text size="xxlarge" weight="bold" color="#cd272c">Reddit Monopoly Lobby</text>
+        <text size="xxlarge" weight="bold" color="#cd272c">Reddit estates Lobby</text>
         <vstack gap="medium" width="100%" alignment="center">
           <text size="large">Players ({gameState?.players.length || 0}/5)</text>
           {gameState?.players?.map((p) => (
@@ -339,7 +423,7 @@ Devvit.addCustomPostType({
     ) : (
       <vstack height="100%">
         <webview
-          id="monopolyBoard"
+          id="estatesBoard"
           url="page.html"
           height={context.dimensions?.width ?? 600 < 600 ? 400 : 600}
           onMessage={onMessage}
